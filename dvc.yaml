@@ -1,0 +1,18 @@
+stages:
+  profile_sft:
+    cmd: trainsight profile --dataset sample_data/sample_sft.jsonl --type sft --strict
+    deps:
+      - sample_data/sample_sft.jsonl
+    outs:
+      - metrics/sft_report.json:
+          cache: false
+
+  profile_gsm8k:
+    cmd: trainsight profile --dataset sample_data/sample_gsm8k.jsonl --type sft --strict
+    deps:
+      - sample_data/sample_gsm8k.jsonl
+
+  profile_dpo:
+    cmd: trainsight profile --dataset sample_data/sample_dpo.jsonl --type dpo --strict
+    deps:
+      - sample_data/sample_dpo.jsonl
