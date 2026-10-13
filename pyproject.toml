@@ -4,24 +4,48 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trainsight"
-version = "0.1.0"
-description = "Pre-training and post-training data validation CLI for LLM workloads"
+version = "0.2.0"
+description = "Preflight checks for LLM training inputs and loss contracts"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Aravind Sundaresan", email = "aravind@example.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
-    "typer[all]>=0.9.0",
-    "rich>=13.0.0",
+    "torch>=2.0.0",
+    "transformers>=4.40.0",
     "pydantic>=2.0.0",
+    "rich>=13.0.0",
+    "typer>=0.9.0",
     "numpy>=1.24.0",
 ]
 
 [project.optional-dependencies]
+trl = [
+    "trl>=0.8.0",
+    "datasets>=2.14.0",
+]
 dev = [
     "pytest>=7.4.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
 ]
 
 [project.scripts]
-trainsight = "trainsight.cli:app"
+trainsight = "trainsight.cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["trainsight*"]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

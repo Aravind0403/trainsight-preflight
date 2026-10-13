@@ -1,79 +1,114 @@
-# TrainSight: Pre-Flight LLM Compute & Representation Profiler
+# TrainSight
 
-`trainsight` is a sub-millisecond pre-flight data validation framework, CLI tool, and Kubernetes InitContainer. It profiles LLM pre-training and post-training dataset manifests (SFT, DPO, GRPO) **before allocating GPUs**, predicting HBM Out-of-Memory (OOM) crashes, padding memory waste, throughput degradation, and attention entropy dispersion in **<0.01 ms CPU execution time**.
+**Preflight checks for LLM training inputs and loss contracts.**
 
----
+[![CI](https://github.com/Aravind0403/transight/actions/workflows/ci.yml/badge.svg)](https://github.com/Aravind0403/transight/actions)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-## 🔬 The Core Scientific Discovery: The Two-Factor Model of LLM Compute
+TrainSight audits tokenization, sequence truncation, and loss masks before launching GPU training runs—and reconciles them against actual in-memory trainer dataloader batches.
 
-TrainSight is built on the **Two-Factor Law of LLM Compute** (ICLR Submission Draft), proving that LLM compute efficiency and representation stability under hardware constraints are governed by two independent failure modes:
-
-1. **Failure Mode 1: Batch Padding Memory Waste** $\to$ Driven independently by sequence-length variance ratio ($\sigma/\mu$).
-2. **Failure Mode 2: Throughput Collapse & Attention Entropy Inflation** $\to$ Driven independently by tail quantiles ($P_{99}$).
-
-### The 2x2 Phase Transition Matrix
-
-| | **Low $P_{99}$ (Short Tail, $< 500$ tok)** | **High $P_{99}$ (Long Context Tail, $> 1,000$ tok)** |
-|---|---|---|
-| **Low $\sigma/\mu$ ($< 0.40$)** | **Clean Execution** *(GSM8K, FineWeb)*<br>• Waste $<15\%$ \| Throughput $>1,800\text{ tok/s}$ \| Sharp Entropy ($H \approx 1.45$) | **Throughput Collapse & Entropy Inflation** *(ShareGPT)*<br>• Waste $<20\%$ \| Throughput drops $>55\%$ ($<900\text{ tok/s}$) \| Entropy inflates ($H > 1.80$) |
-| **High $\sigma/\mu$ ($> 0.75$)** | **Padding Memory Waste Only** *(Alpaca)*<br>• Waste $>40\%$ \| Throughput $>1,400\text{ tok/s}$ \| Sharp Entropy ($H \approx 1.25$) | **Dual Catastrophic Failure / OOM Crash** *(Heavy-Tail Corpus)*<br>• Waste $>53\%$ \| Throughput drops $>80\%$ \| HBM OOM Crash |
+Developed within [Aether Control](https://github.com/Aravind0403/aether-control-llm-infra).
 
 ---
 
-## ⚡ Comparison: Before vs. After (TrainSight Pre-Flight Evolution)
+## 🎯 The Problem
 
-| Feature / Dimension | **Before (Old Pre-Flight Heuristics)** | **After (TrainSight Two-Factor Framework)** |
-| :--- | :--- | :--- |
-| **Scientific Paradigm** | Single-metric assumption (assumed $\sigma/\mu$ caused everything). | **Disentangled Two-Factor Law**: $\sigma/\mu \to \text{Padding Waste}$; $P_{99} \to \text{Throughput Collapse \& Entropy Inflation}$. |
-| **Failure Detection** | Reactive: Jobs crash on GPUs after hours of execution. | **Proactive**: Predicts OOM crashes & waste in **$0.0065\text{ ms}$ CPU latency** before GPU allocation. |
-| **OOM Prediction Accuracy** | Heuristic guesses / manual trial and error. | **Empirical $F1 = 1.0000$ accuracy ($100\%$ precision & recall)** across synthetic and production datasets. |
-| **Representation Stability** | Ignored representation quality; assumed static data is fine. | Tracks **Attention Entropy Inflation ($H(A)$)** caused by padding token dispersion. |
-| **Mitigation Strategy** | Truncate sequences manually, risking data loss. | **Zero-Loss Length Packing / Sorting**: Recovers **$+128.4\%$ throughput** without dropping a single sample. |
-| **Production Integration** | Standalone Python scripts. | **CLI + Kubernetes InitContainer**: Gates pod scheduling before GPU nodes are billed. |
+In modern LLM fine-tuning (SFT and DPO), pipelines frequently suffer from silent execution divergence:
+- **Truncation Starvation**: A verbose prompt consumes the sequence length budget, silently eliminating 100% of the assistant answer tokens. Training continues with `labels == -100` everywhere, producing zero gradients or NaN loss.
+- **Empty Answer Training**: Datasets with missing completions are collated with trailing EOS tokens, silently teaching models to terminate immediately.
+- **Collator Mask Leakage**: Collators fail to set `labels == -100` on prompt or padding tokens, silently training the model on user prompts and padding artifacts.
+- **Template Drift**: Discrepancies between chat template conventions (e.g. ChatML vs. Alpaca) alter token boundaries without throwing syntax errors.
 
----
-
-## 📊 Master Empirical Benchmark Summary
-
-Evaluated on `EleutherAI/pythia-160m` across controlled synthetic grids and 5 production datasets:
-
-| Dataset | Realized $\sigma/\mu$ | $P_{99}$ Tail | TrainSight Risk | Actual Pad Waste % | Actual Attention Entropy $H(A)$ | Throughput (tok/s) | Empirical Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **GSM8K** | 0.280 | 242 tok | **MODERATE** | 20.32% | 1.4544 | **1,961.7** | Clean Execution |
-| **HumanEval** | 0.316 | 243 tok | **MODERATE** | 27.84% | 1.4045 | **1,798.3** | Clean Execution |
-| **FineWeb-Edu** | 0.236 | 525 tok | **LOW** | 17.43% | 1.6037 | **1,649.7** | Clean Execution |
-| **ShareGPT** | 0.377 | **1,077 tok** | **MODERATE** | 26.56% | **1.8365** | **867.5** (-55.8%) | Throughput Collapse |
-| **Alpaca** | **0.802** | 228 tok | **CRITICAL** | **41.51%** | 1.1808 | **1,402.8** | Padding Memory Waste |
+Frameworks like TRL and PyTorch execute these corrupted batches without exception. TrainSight acts as a **fail-closed preflight linter and batch auditor**.
 
 ---
 
-## 💻 CLI & K8s InitContainer Usage
+## ⚡ 5-Minute Quickstart
 
-### 1. Profile Datasets via CLI
+### 1. Installation
+
 ```bash
-# Profile an SFT dataset manifest
-trainsight profile --dataset sample_data/sample_sft.jsonl --type sft
-
-# Profile a DPO preference dataset
-trainsight profile --dataset sample_data/sample_dpo.jsonl --type dpo
-
-# Profile GSM8K math reasoning data
-trainsight profile --dataset sample_data/sample_gsm8k.jsonl --type sft
+pip install trainsight
 ```
 
-### 2. Kubernetes Pre-Flight InitContainer
-```yaml
-initContainers:
-  - name: trainsight-preflight-checker
-    image: trainsight/checker:latest
-    command: ["trainsight", "validate", "--manifest", "/data/sft_manifest.json", "--max-waste-pct", "30"]
+Or install from source:
+```bash
+git clone https://github.com/Aravind0403/transight.git
+cd transight
+pip install -e .
+```
+
+### 2. Run the Interactive Demo
+
+Experience TrainSight detecting deliberate truncation and collator masking faults in under 15 seconds:
+
+```bash
+trainsight demo
+```
+
+### 3. Inspect a Dataset File on Disk
+
+```bash
+trainsight check train_data.jsonl --tokenizer Qwen/Qwen2.5-0.5B-Instruct --max-seq-len 2048
 ```
 
 ---
 
-## 📂 Research Documentation Links
+## 🔬 Two-Tiered Inspection Architecture
 
-- 📜 [ICLR Paper Draft Manuscript](docs/research/trainsight_iclr_paper_draft.md)
-- 📊 [Master Benchmark Results Log](docs/research/benchmark_results.md)
-- 📝 [Research Runner & Tradeoffs Log](docs/research/research_runner_log.md)
-- 🏁 [Project Milestones Tracker](docs/research/milestones.md)
+TrainSight enforces a strict boundary between static files and compiled tensors:
+
+```
+┌─────────────────────────────────┐       ┌─────────────────────────────────┐
+│     TIER 1: DISK PREFLIGHT      │       │  TIER 2: TRAINER RECONCILIATION │
+│    trainsight check data.jsonl  │  ───► │      TrainSightCallback()       │
+├─────────────────────────────────┤       ├─────────────────────────────────┤
+│ • Validates raw schema & syntax │       │ • Audits actual PyTorch batches │
+│ • Pinpoints empty completions   │       │ • Checks labels == -100 on user │
+│ • Catches answers eliminated    │       │ • Verifies pad attention masks  │
+│   by sequence length budget     │       │ • Enforces causal shift (i >= 1)│
+└─────────────────────────────────┘       └─────────────────────────────────┘
+```
+
+---
+
+## 🛠️ Python SDK & Hugging Face / TRL Integration
+
+### Zero-Friction Trainer Callback
+Add `TrainSightCallback` to your `SFTTrainer` or `Trainer` to audit step 0 before any gradient steps execute:
+
+```python
+from trl import SFTTrainer
+from trainsight import TrainSightCallback, LossContract
+
+trainer = SFTTrainer(
+    model=model,
+    train_dataset=dataset,
+    callbacks=[TrainSightCallback(contract=LossContract(strict=True))]
+)
+trainer.train()
+```
+
+If the dataloader produces unmasked prompt tokens or padding leakage, training halts immediately with a pinpoint diagnostic report.
+
+---
+
+## 📊 Measured Benchmark: Native TRL vs. TrainSight
+
+Evaluated across six failure modes on CPU without full model weights ([view benchmark details](benchmarks/sft_comparison/report.md)):
+
+| Failure Mode | Native TRL | Custom Assertions | TrainSight |
+|---|---|---|---|
+| **Clean Input** | Accepted | Accepted | **Accepted** |
+| **Empty Answer** | Accepted *(Silent Fault)* | Blocked | **Blocked** *(Caught Preflight)* |
+| **Answer Removed by Truncation** | Accepted *(Silent Fault)* | Blocked | **Blocked** *(Caught Preflight)* |
+| **Prompt Included in Loss** | Accepted *(Silent Leak)* | Blocked | **Blocked** *(Caught Reconciliation)* |
+| **Template Mismatch** | Accepted *(Silent Drift)* | Blocked | **Blocked** *(Caught Reconciliation)* |
+| **Padding Included in Loss** | Accepted *(Silent Leak)* | Blocked | **Blocked** *(Caught Reconciliation)* |
+
+---
+
+## 📄 License
+
+Apache License 2.0. See [LICENSE](LICENSE) for details.

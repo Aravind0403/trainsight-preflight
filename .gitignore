@@ -1,12 +1,8 @@
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-.venv/
 build/
 develop-eggs/
 dist/
@@ -22,20 +18,13 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Byte-compiled / optimized / DLL files
-*.pyc
-
-# IDEs
-.idea/
-.vscode/
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
 *.swp
 *.swo
-
-# OS
-.DS_Store
-
-# Data & Models
-experiments/data/
-*.bin
-*.safetensors
+venv/
+env/
+.env
+tmp_*/
