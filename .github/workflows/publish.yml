@@ -37,26 +37,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          python -c "
-          import os, tomllib, re
-
-          tag = os.environ.get('RELEASE_TAG', '').lstrip('v')
-          with open('pyproject.toml', 'rb') as f:
-              pyproj_ver = tomllib.load(f)['project']['version']
-          with open('src/trainsight/__init__.py') as f:
-              init_ver = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', f.read()).group(1)
-
-          print(f'Release Tag: {tag}')
-          print(f'pyproject.toml version: {pyproj_ver}')
-          print(f'__init__.py version:    {init_ver}')
-
-          if tag != pyproj_ver or tag != init_ver:
-              raise SystemExit(
-                  f'ERROR: Release tag "{tag}" does not match pyproject.toml ("{pyproj_ver}") '
-                  f'or __init__.py ("{init_ver}"). Release aborted.'
-              )
-          print('✓ Release tag matches declared package version.')
-          "
+          python .github/scripts/verify_release_tag.py
 
       - name: Install build and validation tools
         run: |
