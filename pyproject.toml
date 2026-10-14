@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trainsight"
+name = "trainsight-preflight"
 version = "0.2.0"
 description = "Preflight checks for LLM training inputs and loss contracts"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "Aravind Sundaresan", email = "aravind@example.com" }
+    { name = "Aravind Sundaresan" }
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -39,7 +39,14 @@ dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
+    "build>=1.0.0",
+    "twine>=5.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Aravind0403/transight"
+Repository = "https://github.com/Aravind0403/transight.git"
+Issues = "https://github.com/Aravind0403/transight/issues"
 
 [project.scripts]
 trainsight = "trainsight.cli.main:app"

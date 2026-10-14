@@ -1,4 +1,0 @@
-{"prompt": "What is Python?", "completion": "Python is a high-level programming language."}
-{"prompt": "Explain gradient descent.", "completion": "Gradient descent is an optimization algorithm used to minimize loss functions in machine learning."}
-{"prompt": "Write a short poem about code.", "completion": "Lines of logic, clean and bright, guiding algorithms through the night."}
-{"prompt": "How does vLLM achieve high throughput?", "completion": "vLLM achieves high throughput using PagedAttention for dynamic memory management and continuous batching."}

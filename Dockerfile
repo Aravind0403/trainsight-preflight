@@ -8,8 +8,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Install package dependencies
-COPY pyproject.toml /app/
-COPY trainsight /app/trainsight
+COPY pyproject.toml README.md /app/
+COPY src/ /app/src/
 
 RUN pip install --no-cache-dir .
 

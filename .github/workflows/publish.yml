@@ -1,0 +1,102 @@
+name: Publish Python Distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: "Publishing target destination"
+        required: true
+        type: choice
+        options:
+          - validate
+          - testpypi
+          - pypi
+        default: validate
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-validate:
+    name: Build & Validate Distribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install build and validation tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build sdist and wheel
+        run: |
+          python -m build
+
+      - name: Validate distribution metadata
+        run: |
+          twine check --strict dist/*
+
+      - name: Test installation from wheel
+        run: |
+          pip install dist/*.whl
+          trainsight version
+          trainsight demo
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish-to-testpypi:
+    name: Publish to TestPyPI
+    needs: build-and-validate
+    if: inputs.destination == 'testpypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/trainsight-preflight
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish package to TestPyPI via Trusted Publisher
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          print-hash: true
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: build-and-validate
+    if: inputs.destination == 'pypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/trainsight-preflight
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish package to PyPI via Trusted Publisher
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
