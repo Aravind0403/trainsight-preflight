@@ -5,6 +5,7 @@ TrainSight inspects SFT and DPO datasets and provides utilities for auditing tok
 **Status**: Early-stage tooling. See the [tested environments](#-tested-environments--ci-coverage) for tested configurations. Automatic trainer integration is experimental.
 
 [![CI](https://github.com/Aravind0403/transight/actions/workflows/ci.yml/badge.svg)](https://github.com/Aravind0403/transight/actions)
+[![PyPI](https://img.shields.io/pypi/v/trainsight-preflight.svg)](https://pypi.org/project/trainsight-preflight/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
@@ -12,21 +13,29 @@ Originally developed within [Aether Control](https://github.com/Aravind0403/aeth
 
 ---
 
-## ⚠️ Important Installation Notice
+## 📦 Installation
 
-> **Do not install from PyPI via `pip install trainsight`.**  
-> The distribution name `trainsight` on PyPI is registered to an unrelated project (`modalgrasp/trainsight`). TrainSight must be installed from source in an isolated environment until an independent distribution name is published.
+Install TrainSight from PyPI:
+
+```bash
+pip install trainsight-preflight
+```
+
+> **Note**: The official distribution name on PyPI is **`trainsight-preflight`**. The CLI command and Python import namespace are both **`trainsight`**.  
+> *(Do not install `trainsight`, which is an unrelated third-party package).*
+
+To install with optional trainer support (TRL):
+```bash
+pip install "trainsight-preflight[trl]"
+```
 
 ### Installation from Source
-
-Use an isolated virtual environment to prevent package collisions:
-
 ```bash
 git clone https://github.com/Aravind0403/transight.git
 cd transight
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e ".[trl]"
 ```
 
 Verify your installation:

@@ -4,17 +4,17 @@ Get started with TrainSight in an isolated virtual environment.
 
 ---
 
-## Step 1: Install from Source
+## Step 1: Install from PyPI
 
-> **Note**: Do not run `pip install trainsight` (that name belongs to an unrelated PyPI package). Install from source in a dedicated virtual environment:
+Install TrainSight in a dedicated virtual environment:
 
 ```bash
-git clone https://github.com/Aravind0403/transight.git
-cd transight
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install trainsight-preflight
 ```
+
+> **Note**: The official distribution name on PyPI is **`trainsight-preflight`**. The CLI entrypoint and import namespace are **`trainsight`**.
 
 Verify the installation:
 ```bash
