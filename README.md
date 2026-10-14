@@ -2,7 +2,7 @@
 
 TrainSight inspects SFT and DPO datasets and provides utilities for auditing tokenized training batches. It helps identify empty answers, truncation, and supervision that conflicts with the declared training objective.
 
-**Status**: Early-stage tooling. See the [compatibility table](#-tested-compatibility) for tested configurations. Automatic trainer integration is experimental.
+**Status**: Early-stage tooling. See the [tested environments](#-tested-environments--ci-coverage) for tested configurations. Automatic trainer integration is experimental.
 
 [![CI](https://github.com/Aravind0403/transight/actions/workflows/ci.yml/badge.svg)](https://github.com/Aravind0403/transight/actions)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -267,7 +267,7 @@ Automated testing executed via GitHub Actions on every pull request and push to 
 | **Executed Test Suite** | `pytest tests/ -v` | Unit tests (`test_sft_inspector`, `test_sft_reconciler`, `test_causal_shift`) and CLI demo flow (`test_demo_flow`). |
 | **Trainer Integration Test** | `tests/integration/test_trl_integration.py` | Instantiates a minimal CPU `SFTTrainer` with sequential sampling and verifies that collated batch tensors reconcile against the loss contract under the resolved CI TRL version. |
 
-> **Dependency Bounds Disclaimer**: Permissive dependency ranges in `pyproject.toml` indicate packaging bounds, not verified testing across every intervening release. Pinned reproducibility is guaranteed in the documented local benchmark environment.
+> **Dependency Bounds Disclaimer**: Permissive dependency ranges in `pyproject.toml` indicate packaging bounds, not verified testing across every intervening release. The benchmark’s recorded dependency versions are listed above.
 
 ---
 
