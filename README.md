@@ -4,7 +4,7 @@ TrainSight inspects SFT and DPO datasets and provides utilities for auditing tok
 
 **Status**: Early-stage tooling. See the [tested environments](#-tested-environments--ci-coverage) for tested configurations. Automatic trainer integration is experimental.
 
-[![CI](https://github.com/Aravind0403/transight/actions/workflows/ci.yml/badge.svg)](https://github.com/Aravind0403/transight/actions)
+[![CI](https://github.com/Aravind0403/trainsight-preflight/actions/workflows/ci.yml/badge.svg)](https://github.com/Aravind0403/trainsight-preflight/actions)
 [![PyPI](https://img.shields.io/pypi/v/trainsight-preflight.svg)](https://pypi.org/project/trainsight-preflight/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -31,8 +31,8 @@ pip install "trainsight-preflight[trl]"
 
 ### Installation from Source
 ```bash
-git clone https://github.com/Aravind0403/transight.git
-cd transight
+git clone https://github.com/Aravind0403/trainsight-preflight.git
+cd trainsight-preflight
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[trl]"

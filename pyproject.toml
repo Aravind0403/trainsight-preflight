@@ -44,9 +44,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Aravind0403/transight"
-Repository = "https://github.com/Aravind0403/transight.git"
-Issues = "https://github.com/Aravind0403/transight/issues"
+Homepage = "https://github.com/Aravind0403/trainsight-preflight"
+Repository = "https://github.com/Aravind0403/trainsight-preflight.git"
+Issues = "https://github.com/Aravind0403/trainsight-preflight/issues"
 
 [project.scripts]
 trainsight = "trainsight.cli.main:app"
