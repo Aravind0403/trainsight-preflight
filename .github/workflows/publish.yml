@@ -1,6 +1,8 @@
 name: Publish Python Distribution
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       destination:
@@ -29,6 +31,32 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+
+      - name: Verify release tag matches package version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python -c "
+          import os, tomllib, re
+
+          tag = os.environ.get('RELEASE_TAG', '').lstrip('v')
+          with open('pyproject.toml', 'rb') as f:
+              pyproj_ver = tomllib.load(f)['project']['version']
+          with open('src/trainsight/__init__.py') as f:
+              init_ver = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', f.read()).group(1)
+
+          print(f'Release Tag: {tag}')
+          print(f'pyproject.toml version: {pyproj_ver}')
+          print(f'__init__.py version:    {init_ver}')
+
+          if tag != pyproj_ver or tag != init_ver:
+              raise SystemExit(
+                  f'ERROR: Release tag "{tag}" does not match pyproject.toml ("{pyproj_ver}") '
+                  f'or __init__.py ("{init_ver}"). Release aborted.'
+              )
+          print('✓ Release tag matches declared package version.')
+          "
 
       - name: Install build and validation tools
         run: |
@@ -59,7 +87,7 @@ jobs:
   publish-to-testpypi:
     name: Publish to TestPyPI
     needs: build-and-validate
-    if: inputs.destination == 'testpypi'
+    if: github.event_name == 'workflow_dispatch' && inputs.destination == 'testpypi'
     runs-on: ubuntu-latest
     environment:
       name: testpypi
@@ -82,7 +110,7 @@ jobs:
   publish-to-pypi:
     name: Publish to PyPI
     needs: build-and-validate
-    if: inputs.destination == 'pypi'
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.destination == 'pypi')
     runs-on: ubuntu-latest
     environment:
       name: pypi
