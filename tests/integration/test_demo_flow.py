@@ -1,4 +1,5 @@
 from typer.testing import CliRunner
+from trainsight import __version__
 from trainsight.cli.main import app
 
 runner = CliRunner()
@@ -13,4 +14,4 @@ def test_demo_command_runs_successfully():
 def test_version_command():
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert "TrainSight version: 0.2.0" in result.output
+    assert f"TrainSight version: {__version__}" in result.output
