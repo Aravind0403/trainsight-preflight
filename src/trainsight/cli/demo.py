@@ -78,12 +78,15 @@ def run_demo():
         fault_report = inspector.inspect_file(fault_file)
         if fault_report.truncated_answers_count > 0:
             console.print("[bold red]✗ Preflight Quality Gate Caught Fault from Report Results:[/]")
+            panel_content = (
+                f"[bold red]CRITICAL CONTRACT VIOLATION:[/] {fault_report.truncated_answers_count} answer(s) eliminated by truncation.\n"
+                f"Row ID: [bold]row_004[/]\n"
+                f"• Prompt consumed available token budget (max_seq_len=256).\n"
+                f"• Retained answer tokens: 0.\n"
+                f"• Impact: Example retains zero supervised targets."
+            )
             console.print(Panel(
-                f"[bold red]CRITICAL CONTRACT VIOLATION:[/] {fault_report.truncated_answers_count} answer(s) eliminated by truncation.\\n"
-                f"Row ID: [bold]row_004[/]\\n"
-                f"• Prompt consumed available token budget (max_seq_len=256).\\n"
-                f"• Retained answer tokens: 0.\\n"
-                f"• Impact: Example retains zero supervised targets.",
+                panel_content,
                 title="TrainSight Preflight Gate (Actual Inspection Report)",
                 border_style="red",
             ))
@@ -113,12 +116,15 @@ def run_demo():
         if not audit.passed and len(audit.diagnoses) > 0:
             diag = audit.diagnoses[0]
             console.print("[bold red]✗ Batch Reconciler Caught Post-Collation Mask Leakage:[/]")
+            diag_content = (
+                f"[bold red]COLLATOR LEAKAGE:[/] {diag.error_code}\n"
+                f"{diag.error_message}\n"
+                f"• Prompt length: {diag.evidence.prompt_token_length} tokens.\n"
+                f"• Unmasked prompt tokens receiving loss: {diag.evidence.unmasked_prompt_tokens_count}.\n"
+                f"• Impact: Gradients would be computed over user prompt tokens."
+            )
             console.print(Panel(
-                f"[bold red]COLLATOR LEAKAGE:[/] {diag.error_code}\\n"
-                f"{diag.error_message}\\n"
-                f"• Prompt length: {diag.evidence.prompt_token_length} tokens.\\n"
-                f"• Unmasked prompt tokens receiving loss: {diag.evidence.unmasked_prompt_tokens_count}.\\n"
-                f"• Impact: Gradients would be computed over user prompt tokens.",
+                diag_content,
                 title="TrainSight Batch Reconciler (Synthetic Corrupted Batch)",
                 border_style="red",
             ))
