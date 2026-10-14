@@ -14,9 +14,13 @@ class TrainSightCallback(TrainerCallback):
     - Inspects only a single sampled batch at step 0, not full-dataset tensor coverage.
     - If dataloader uses random shuffling, dataset index mapping may not correspond 1:1
       unless sequential sampling or row IDs are preserved in collation.
+    - Circular fallback limitation: If the dataset is inaccessible and the callback derives
+      prompt boundaries from the first unmasked label index, the check is circular: it assumes
+      the labels are correct to define the boundary, and therefore cannot independently detect
+      whether prompt tokens are unmasked.
     - In standard Transformers callback dispatchers, the `trainer` reference is not
-      automatically supplied in kwargs; pass `trainer` directly if automatic dataloader
-      extraction fails.
+      automatically supplied in kwargs; pass `trainer` explicitly:
+      `trainer.add_callback(TrainSightCallback(trainer=trainer))` or pass it during initialization.
     """
 
     def __init__(
@@ -79,11 +83,18 @@ class TrainSightCallback(TrainerCallback):
                     if isinstance(p_text, list):  # conversational messages
                         p_ids = tokenizer.apply_chat_template(p_text, tokenize=True, add_generation_prompt=True)
                         p_len = len(p_ids[0] if isinstance(p_ids[0], list) else p_ids)
-                    else:
+                    elif "<|im_start|>" in str(p_text):
                         p_len = len(tokenizer.encode(p_text, add_special_tokens=False))
+                    else:
+                        formatted_p = tokenizer.apply_chat_template([{"role": "user", "content": str(p_text)}], tokenize=False, add_generation_prompt=True)
+                        p_len = len(tokenizer.encode(formatted_p, add_special_tokens=False))
                     prompt_lengths.append(p_len)
             else:
-                # Fallback: estimate prompt length from first unmasked label index
+                self.console.print(
+                    "[bold yellow]! TrainSight Warning (Circular Fallback):[/] "
+                    "Dataset is inaccessible; falling back to first unmasked label index for prompt boundary. "
+                    "This fallback cannot independently detect whether prompt tokens were unmasked."
+                )
                 labels = batch["labels"]
                 for b in range(labels.shape[0]):
                     active = (labels[b] != -100).nonzero(as_tuple=True)[0]

@@ -102,8 +102,10 @@ OpenAI message list format:
 ## 💻 CLI Usage & Expected Outputs
 
 ### Inspecting an SFT Dataset
+Using the included clean SFT fixture (`tests/fixtures/clean_sft.jsonl`) with a 256-token limit:
+
 ```bash
-trainsight check data.jsonl --tokenizer Qwen/Qwen2.5-0.5B-Instruct --max-seq-len 2048
+trainsight check tests/fixtures/clean_sft.jsonl --tokenizer Qwen/Qwen2.5-0.5B-Instruct --max-seq-len 256
 ```
 
 #### Expected Output on Clean Data:
@@ -126,16 +128,21 @@ File: clean_sft.jsonl | Task: SFT | Max Length: 256
 ✓ Preflight Quality Gate Passed: Dataset meets all loss contract requirements.
 ```
 
-#### Expected Output on Contract Violation:
+#### Expected Output on Contract Violation (Truncation Fault):
 ```text
+TrainSight Preflight Inspection
+File: truncated_answer.jsonl | Task: SFT | Max Length: 256
+
 ┌───────────────────────┬────────────┬────────┐
 │ Metric                │      Value │ Status │
 ├───────────────────────┼────────────┼────────┤
-│ Total Samples         │          1 │ OK     │
-│ Valid Samples         │          0 │ FAIL   │
+│ Total Samples         │         25 │ OK     │
+│ Valid Samples         │         24 │ FAIL   │
 │ Empty Completions     │          0 │ OK     │
 │ Truncated Answers     │          1 │ FAIL   │
 │ Misaligned Loss Masks │          0 │ OK     │
+│ Mean Sequence Length  │ 119.5 tok  │ Info   │
+│ Max Sequence Length   │   256 tok  │ Info   │
 └───────────────────────┴────────────┴────────┘
 
 ✗ Preflight Quality Gate Failed: Contract violations detected above.
@@ -151,42 +158,58 @@ File: clean_sft.jsonl | Task: SFT | Max Length: 256
 ## 🛠️ Python SDK Integration
 
 ### Explicit Batch Reconciliation (Recommended)
-Extract and audit batches directly from your PyTorch or Hugging Face DataLoader before running a full training loop:
+To avoid boundary discrepancies, derive prompt boundaries from the identical chat template preprocessing rather than raw prompt string lengths, and preserve row correspondence through batching:
 
 ```python
 from transformers import AutoTokenizer
-from trainsight import SFTReconciler, LossContract
+import torch
+from trainsight import SFTReconciler, SFTPreprocessor, LossContract
 
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
-reconciler = SFTReconciler(
-    tokenizer=tokenizer,
-    contract=LossContract(
-        answer_only_loss=True,
-        mask_padding=True,
-        require_causal_shift_supervision=True,
-        strict=True,
-    )
-)
+MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+preprocessor = SFTPreprocessor(tokenizer_name=MODEL_NAME, max_seq_len=256)
+reconciler = SFTReconciler(tokenizer=tokenizer, contract=LossContract(strict=True))
 
-# Audit a batch from your training DataLoader
+# 1. Obtain boundaries using the identical formatted chat template
+batch_samples = [train_dataset[i] for i in range(batch_size)]
+prompt_lengths = [
+    preprocessor.process_sample(sample).prompt_tokens_len
+    for sample in batch_samples
+]
+
+# 2. Extract compiled in-memory batch from dataloader (preserving 1:1 row order)
 batch = next(iter(train_dataloader))
-prompt_lengths = [len(tokenizer.encode(ex["prompt"])) for ex in dataset_batch]
 
-report = reconciler.audit_batch(batch=batch, prompt_lengths=prompt_lengths)
+# 3. Audit batch tensors against declared loss contract
+report = reconciler.audit_batch(
+    batch=batch,
+    prompt_lengths=prompt_lengths,
+    row_ids=[s.get("id", f"row_{i}") for i, s in enumerate(batch_samples)],
+    raw_samples=batch_samples,
+)
 print(f"Batch audit passed: {report.passed}")
 ```
 
 ### Experimental: Trainer Callback
-TrainSight provides a `TrainSightCallback` for step-0 verification:
+TrainSight provides an experimental `TrainSightCallback` for step-0 verification in Hugging Face / TRL:
 
 ```python
+from trl import SFTTrainer
 from trainsight import TrainSightCallback
 
-# Note: Pass trainer explicitly if your environment's callback dispatcher
-# does not automatically forward dataloaders in kwargs.
+trainer = SFTTrainer(model=model, train_dataset=dataset, ...)
+
+# Explicitly attach callback and pass trainer reference
 callback = TrainSightCallback(trainer=trainer, fail_closed=True)
+trainer.add_callback(callback)
+
+trainer.train()
 ```
-> **Caveats**: `TrainSightCallback` audits only the first sampled batch. It derives prompt lengths from dataset rows, which may not align if dataloaders apply random shuffling without persistent row IDs. For strict verification, use explicit batch reconciliation.
+
+> **Known Limitations of `TrainSightCallback`**:
+> 1. *Single Sampled Batch*: Audits only the first batch (step 0), not full dataset training batches.
+> 2. *Shuffling Misalignment*: If the dataloader uses random shuffling, dataset row indexing will not match batch row ordering unless sequential sampling is configured.
+> 3. *Circular Fallback Heuristic*: If the trainer's dataset is inaccessible and the callback falls back to deriving boundaries from the first unmasked label index, the check becomes circular: it derives prompt boundaries from the very labels being audited and cannot independently detect if prompt tokens were unmasked.
 
 ---
 
@@ -216,16 +239,16 @@ In a local fault-injection comparison, TrainSight and custom assertions detected
 
 TrainSight has been verified against the following environment:
 
-| Dependency / Component | Verified Version | Notes |
+| Component | Tested Version / Configuration | Notes |
 |---|---|---|
-| **Python** | `3.10`, `3.11`, `3.12` | Verified in CI matrix |
+| **Python** | `3.10`, `3.11`, `3.12` | Verified via CI matrix installing `[dev,trl]` dependencies |
 | **PyTorch** | `2.10.0` | CPU tensor validation |
 | **Transformers** | `5.5.0` | FastTokenizer chat template processing |
 | **TRL** | `0.24.0` | Tested with `SFTConfig(completion_only_loss=True)` |
 | **Tokenizer & Template** | `Qwen/Qwen2.5-0.5B-Instruct` | ChatML template formatting |
 | **Declared Objective** | Answer-only causal loss | Masked prompt (`labels=-100`), masked padding, active label at $i \ge 1$ |
 
-> Permissive dependency ranges in `pyproject.toml` (e.g. `transformers>=4.40.0`) indicate compatibility bounds, not verified testing across every intervening release.
+> Permissive dependency ranges in `pyproject.toml` (e.g. `transformers>=4.40.0` or `trl>=0.8.0`) indicate packaging bounds, not verified testing across every intervening release.
 
 ---
 

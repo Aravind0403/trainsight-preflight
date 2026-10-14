@@ -108,6 +108,7 @@ class SFTInspector:
         baseline_seq_lengths: Optional[List[int]] = None,
     ) -> SFTReport:
         """Inspects a dataset file using the exact shared preprocessor and loss mask verifier."""
+        file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"Dataset file not found: {file_path}")
 

@@ -144,6 +144,7 @@ class DPOInspector:
         return str(candidate_field).strip(), False, False
 
     def inspect_file(self, file_path: Path) -> DPOReport:
+        file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
