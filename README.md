@@ -157,8 +157,10 @@ File: truncated_answer.jsonl | Task: SFT | Max Length: 256
 
 ## 🛠️ Python SDK Integration
 
-### Explicit Batch Reconciliation (Recommended)
-To avoid boundary discrepancies, derive prompt boundaries from the identical chat template preprocessing rather than raw prompt string lengths, and preserve row correspondence through batching:
+### Explicit Batch Reconciliation
+To reconcile model input tensors against your loss contract, the audit requires exact row-level correspondence between raw samples and batch tensors.
+
+The example below demonstrates this by constructing a model-ready batch directly from verified preprocessed samples (mirroring [`examples/01_quickstart_sft.py`](examples/01_quickstart_sft.py)). If you audit an active PyTorch dataloader instead, ensure your collator explicitly propagates row IDs and prompt boundaries alongside the batch, or evaluate batches using a sequential sampler without shuffling:
 
 ```python
 from transformers import AutoTokenizer
@@ -168,38 +170,42 @@ from trainsight import SFTReconciler, SFTPreprocessor, LossContract
 MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 preprocessor = SFTPreprocessor(tokenizer_name=MODEL_NAME, max_seq_len=256)
-reconciler = SFTReconciler(tokenizer=tokenizer, contract=LossContract(strict=True))
+contract = LossContract(max_seq_len=256, strict=True)
+reconciler = SFTReconciler(tokenizer=tokenizer, contract=contract)
 
-# 1. Obtain boundaries using the identical formatted chat template
-batch_samples = [train_dataset[i] for i in range(batch_size)]
-prompt_lengths = [
-    preprocessor.process_sample(sample).prompt_tokens_len
-    for sample in batch_samples
-]
+# 1. Define raw sample and derive token boundaries from formatted chat template
+sample = {
+    "id": "row_001",
+    "prompt": "What is the capital of France?",
+    "completion": "The capital of France is Paris.",
+}
+clean_ex = preprocessor.process_sample(sample)
 
-# 2. Extract compiled in-memory batch from dataloader (preserving 1:1 row order)
-batch = next(iter(train_dataloader))
+# 2. Construct model-ready batch directly from preprocessed samples (guarantees 1:1 row alignment)
+batch = {
+    "input_ids": torch.tensor([clean_ex.input_ids]),
+    "labels": torch.tensor([clean_ex.labels]),
+    "attention_mask": torch.tensor([clean_ex.attention_mask]),
+}
 
 # 3. Audit batch tensors against declared loss contract
 report = reconciler.audit_batch(
     batch=batch,
-    prompt_lengths=prompt_lengths,
-    row_ids=[s.get("id", f"row_{i}") for i, s in enumerate(batch_samples)],
-    raw_samples=batch_samples,
+    prompt_lengths=[clean_ex.prompt_tokens_len],
+    row_ids=[sample["id"]],
+    raw_samples=[sample],
 )
 print(f"Batch audit passed: {report.passed}")
 ```
 
 ### Experimental: Trainer Callback
-TrainSight provides an experimental `TrainSightCallback` for step-0 verification in Hugging Face / TRL:
+TrainSight provides an experimental `TrainSightCallback` for step-0 verification in Hugging Face / TRL trainers. Attach the callback directly to an initialized trainer:
 
 ```python
-from trl import SFTTrainer
 from trainsight import TrainSightCallback
 
-trainer = SFTTrainer(model=model, train_dataset=dataset, ...)
-
-# Explicitly attach callback and pass trainer reference
+# Attach callback to an initialized trainer instance
+# (For a complete runnable SFTTrainer setup, see tests/integration/test_trl_integration.py)
 callback = TrainSightCallback(trainer=trainer, fail_closed=True)
 trainer.add_callback(callback)
 
@@ -235,20 +241,33 @@ In a local fault-injection comparison, TrainSight and custom assertions detected
 
 ---
 
-## 🔍 Tested Compatibility
+## 🔍 Tested Environments & CI Coverage
 
-TrainSight has been verified against the following environment:
+To maintain transparency between local frozen benchmark results and automated CI checks, their scopes are reported separately:
 
-| Component | Tested Version / Configuration | Notes |
+### Local Benchmark Environment
+The exact pinned package versions used for the reproducible fault-injection evaluation ([benchmarks/sft_comparison/report.md](benchmarks/sft_comparison/report.md)):
+
+| Component | Pinned Version / Setting | Scope |
 |---|---|---|
-| **Python** | `3.10`, `3.11`, `3.12` | Verified via CI matrix installing `[dev,trl]` dependencies |
-| **PyTorch** | `2.10.0` | CPU tensor validation |
-| **Transformers** | `5.5.0` | FastTokenizer chat template processing |
-| **TRL** | `0.24.0` | Tested with `SFTConfig(completion_only_loss=True)` |
+| **Python** | `3.12.8` | Local runtime (macOS / Linux CPU) |
+| **PyTorch** | `2.10.0` | Tensor manipulation and loss contract checking |
+| **Transformers** | `5.5.0` | FastTokenizer ChatML template processing |
+| **TRL** | `0.24.0` | Pinned comparison with `SFTConfig(completion_only_loss=True)` |
 | **Tokenizer & Template** | `Qwen/Qwen2.5-0.5B-Instruct` | ChatML template formatting |
 | **Declared Objective** | Answer-only causal loss | Masked prompt (`labels=-100`), masked padding, active label at $i \ge 1$ |
 
-> Permissive dependency ranges in `pyproject.toml` (e.g. `transformers>=4.40.0` or `trl>=0.8.0`) indicate packaging bounds, not verified testing across every intervening release.
+### Continuous Integration (CI) Coverage
+Automated testing executed via GitHub Actions on every pull request and push to `main` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
+
+| Dimension | CI Scope | Details |
+|---|---|---|
+| **Python Versions** | `3.10`, `3.11`, `3.12` | Matrix build on `ubuntu-latest` |
+| **Resolved Dependencies** | `pip install -e ".[dev,trl]"` | Resolves dependencies according to packaging bounds (`transformers>=4.40.0`, `trl>=0.8.0`, `torch>=2.0.0`). Does **not** pin historical `trl==0.24.0`. |
+| **Executed Test Suite** | `pytest tests/ -v` | Unit tests (`test_sft_inspector`, `test_sft_reconciler`, `test_causal_shift`) and CLI demo flow (`test_demo_flow`). |
+| **Trainer Integration Test** | `tests/integration/test_trl_integration.py` | Instantiates a minimal CPU `SFTTrainer` with sequential sampling and verifies that collated batch tensors reconcile against the loss contract under the resolved CI TRL version. |
+
+> **Dependency Bounds Disclaimer**: Permissive dependency ranges in `pyproject.toml` indicate packaging bounds, not verified testing across every intervening release. Pinned reproducibility is guaranteed in the documented local benchmark environment.
 
 ---
 
