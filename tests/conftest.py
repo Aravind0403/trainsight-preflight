@@ -19,3 +19,11 @@ def empty_answer_path():
 @pytest.fixture
 def truncated_answer_path():
     return FIXTURES_DIR / "faults" / "truncated_answer.jsonl"
+
+@pytest.fixture
+def clean_dpo_path():
+    return FIXTURES_DIR / "clean_dpo.jsonl"
+
+@pytest.fixture
+def dpo_defects_path():
+    return FIXTURES_DIR / "faults" / "dpo_defects.jsonl"

@@ -1,0 +1,5 @@
+{"prompt": "What is Python?", "chosen": "Python is a high-level programming language.", "rejected": "Python is a high-level programming language."}
+{"prompt": "How to sort an array?", "chosen": "Use sort().", "rejected": "Use sorted().", "score_chosen": 2.0, "score_rejected": 9.0}
+{"prompt": "Tell me a joke.", "chosen": "", "rejected": "Why did the chicken cross the road?"}
+{"prompt": "Define recursion.", "chosen": [{"role": "user", "content": "Different question entirely"}, {"role": "assistant", "content": "Recursion is when a function calls itself."}], "rejected": [{"role": "user", "content": "Different question entirely"}, {"role": "assistant", "content": "Recursion is iteration."}]}
+{"prompt": "What is 2+2?", "chosen": "4", "rejected": "5"}

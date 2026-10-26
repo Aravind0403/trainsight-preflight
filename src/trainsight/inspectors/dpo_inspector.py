@@ -35,6 +35,22 @@ class DPOReport(BaseModel):
     advisories: List[str] = Field(default_factory=list)
     recommendations: List[str] = Field(default_factory=list)
 
+    @property
+    def total_pairs(self) -> int:
+        return self.total_samples
+
+    @property
+    def valid_pairs_count(self) -> int:
+        return self.valid_samples_count
+
+    @property
+    def invalid_pairs_count(self) -> int:
+        return self.invalid_rows_count
+
+    @property
+    def over_budget_completions(self) -> int:
+        return self.over_budget_completions_count
+
 
 class DPOInspector:
     """
@@ -58,7 +74,15 @@ class DPOInspector:
         max_total_len: int = 2048,
         jaccard_similarity_threshold: float = 0.90,
         strict: bool = False,
+        max_seq_len_threshold: Optional[int] = None,
     ):
+        if max_seq_len_threshold is not None:
+            max_total_len = max_seq_len_threshold
+            if max_prompt_len > max_total_len:
+                max_prompt_len = max_total_len // 2
+            if max_completion_len > max_total_len:
+                max_completion_len = max_total_len // 2
+
         self.tokenizer_name = tokenizer_name
         self.max_prompt_len = max_prompt_len
         self.max_completion_len = max_completion_len

@@ -1,0 +1,3 @@
+{"prompt": "How do I reverse a list in Python?", "chosen": "You can reverse a list in Python using `lst.reverse()` in-place or `reversed(lst)` / slicing `lst[::-1]`.", "rejected": "Lists cannot be reversed in Python directly without external libraries."}
+{"prompt": "What is the capital of France?", "chosen": "The capital of France is Paris.", "rejected": "The capital of France is London."}
+{"prompt": "Explain gradient descent in one sentence.", "chosen": "Gradient descent is an iterative optimization algorithm used to minimize a loss function by moving in the direction of steepest descent.", "rejected": "Gradient descent is a machine learning technique where models increase the learning rate indefinitely until convergence."}
