@@ -157,9 +157,46 @@ File: truncated_answer.jsonl | Task: SFT | Max Length: 256
 ✗ Preflight Quality Gate Failed: Contract violations detected above.
 ```
 
+### Inspecting a DPO Dataset
+Using the included clean DPO fixture (`tests/fixtures/clean_dpo.jsonl`):
+
+```bash
+trainsight check tests/fixtures/clean_dpo.jsonl --task dpo --tokenizer Qwen/Qwen2.5-0.5B-Instruct
+```
+
+#### Expected Output on Clean Preference Data:
+```text
+TrainSight Preflight Inspection
+File: clean_dpo.jsonl | Task: DPO | Max Length: 2048
+
+                    DPO Preflight Summary                     
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Metric                          ┃           Value ┃ Status ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ Total Pairs                     │               3 │ OK     │
+│ Valid Pairs                     │               3 │ OK     │
+│ Empty Pairs                     │               0 │ OK     │
+│ Identical Pairs (Zero Gradient) │               0 │ OK     │
+│ Preference Reversals            │               0 │ OK     │
+│ Prompt Mismatches               │               0 │ OK     │
+│ Near-Identical Pairs            │               0 │ Info   │
+│ Duplicate Prompts               │               0 │ Info   │
+│ Mean Prompt Length              │     37.0 tokens │ Info   │
+│ Mean Chosen Length              │     19.7 tokens │ Info   │
+│ Mean Rejected Length            │     11.7 tokens │ Info   │
+│ Length Bias Ratio (C/R)         │            1.69 │ OK     │
+│ Over-Budget Prompts (>1024)     │               0 │ OK     │
+│ Over-Budget Completions (>1024) │               0 │ OK     │
+│ Over-Budget Total (>2048)       │               0 │ OK     │
+│ Phase Quadrant                  │ Clean Execution │ OK     │
+└─────────────────────────────────┴─────────────────┴────────┘
+
+✓ Preflight Quality Gate Passed: DPO dataset meets preference contract requirements.
+```
+
 ### Exit Behavior
-- **Default (`--strict`)**: Exits with returncode `1` if any empty completions, truncated answers, or invalid rows are detected. Exits with `0` if all examples satisfy the contract.
-- **Non-Strict (`--no-strict`)**: Logs metrics and warnings but exits with code `0`.
+- **Default (`--strict`)**: Exits with returncode `1` if any empty completions, truncated answers, identical zero-gradient pairs, preference reversals, or invalid rows are detected. Exits with `0` if all examples satisfy the contract.
+- **Non-Strict (`--no-strict`)**: Logs metrics, advisories, and warnings but exits with code `0`.
 - **Parsing Failures**: If the file does not exist, syntax is invalid, or the tokenizer cannot load, execution halts with code `1`.
 
 ---
@@ -273,7 +310,7 @@ Automated testing executed via GitHub Actions on every pull request and push to 
 |---|---|---|
 | **Python Versions** | `3.10`, `3.11`, `3.12` | Matrix build on `ubuntu-latest` |
 | **Resolved Dependencies** | `pip install -e ".[dev,trl]"` | Resolves dependencies according to packaging bounds (`transformers>=4.40.0`, `trl>=0.8.0`, `torch>=2.0.0`). Does **not** pin historical `trl==0.24.0`. |
-| **Executed Test Suite** | `pytest tests/ -v` | Unit tests (`test_sft_inspector`, `test_sft_reconciler`, `test_causal_shift`) and CLI demo flow (`test_demo_flow`). |
+| **Executed Test Suite** | `pytest tests/ -v` | Unit tests (`test_sft_inspector`, `test_dpo_inspector`, `test_cli_check`, `test_sft_reconciler`, `test_causal_shift`) and integration tests (`test_demo_flow`, `test_trl_integration`). |
 | **Trainer Integration Test** | `tests/integration/test_trl_integration.py` | Instantiates a minimal CPU `SFTTrainer` with sequential sampling and verifies that collated batch tensors reconcile against the loss contract under the resolved CI TRL version. |
 
 > **Dependency Bounds Disclaimer**: Permissive dependency ranges in `pyproject.toml` indicate packaging bounds, not verified testing across every intervening release. The benchmark’s recorded dependency versions are listed above.
