@@ -303,6 +303,8 @@ The exact pinned package versions used for the reproducible fault-injection eval
 | **Tokenizer & Template** | `Qwen/Qwen2.5-0.5B-Instruct` | ChatML template formatting |
 | **Declared Objective** | Answer-only causal loss | Masked prompt (`labels=-100`), masked padding, active label at $i \ge 1$ |
 
+> **Note:** the benchmark ran on a locally patched TRL 0.24.0. The only difference from the stock PyPI wheel is `trl/import_utils.py` (its optional-package check mis-detects `llm_blender` under Transformers 5.5.0); collation and loss code are unmodified. The repo's CI uses stock TRL 0.24.0.
+
 ### Continuous Integration (CI) Coverage
 Automated testing executed via GitHub Actions on every pull request and push to `main` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
 
