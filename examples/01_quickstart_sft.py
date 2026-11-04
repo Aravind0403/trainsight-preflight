@@ -16,8 +16,8 @@ print(f"1. Preflight Inspection Passed: {report.valid_samples_count}/{report.tot
 
 # 2. Audit a Batch Directly Built from Preprocessed Samples
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-preprocessor = SFTPreprocessor(tokenizer_name=MODEL_NAME, max_seq_len=256)
-contract = LossContract(max_seq_len=256, strict=True)
+preprocessor = SFTPreprocessor(tokenizer=tokenizer, max_seq_len=256)
+contract = LossContract.from_tokenizer(tokenizer, max_seq_len=256, strict=True)
 reconciler = SFTReconciler(tokenizer=tokenizer, contract=contract)
 
 # Verified sample definition

@@ -109,9 +109,14 @@ OpenAI message list format:
 {"messages": [{"role": "user", "content": "Solve: 15 * 8"}, {"role": "assistant", "content": "15 * 8 = 120."}]}
 ```
 
-### DPO Record Example
+### DPO Record Examples
+Key-pair format:
 ```json
 {"prompt": "Explain recursion.", "chosen": "Recursion occurs when a function calls itself...", "rejected": "It is when things repeat."}
+```
+Conversational multi-turn format:
+```json
+{"chosen": [{"role": "user", "content": "How do I optimize DDP?"}, {"role": "assistant", "content": "Transition to ZeRO-2 or FSDP to shard optimizer states."}], "rejected": [{"role": "user", "content": "How do I optimize DDP?"}, {"role": "assistant", "content": "Offload everything to CPU."}]}
 ```
 
 ---
@@ -130,17 +135,26 @@ trainsight check tests/fixtures/clean_sft.jsonl --tokenizer Qwen/Qwen2.5-0.5B-In
 TrainSight Preflight Inspection
 File: clean_sft.jsonl | Task: SFT | Max Length: 256
 
-┌───────────────────────┬────────────┬────────┐
-│ Metric                │      Value │ Status │
-├───────────────────────┼────────────┼────────┤
-│ Total Samples         │         25 │ OK     │
-│ Valid Samples         │         25 │ OK     │
-│ Empty Completions     │          0 │ OK     │
-│ Truncated Answers     │          0 │ OK     │
-│ Misaligned Loss Masks │          0 │ OK     │
-│ Mean Sequence Length  │ 111.2 tok  │ Info   │
-│ Max Sequence Length   │   246 tok  │ Info   │
-└───────────────────────┴────────────┴────────┘
+               SFT Preflight Summary                
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Metric                ┃           Value ┃ Status ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ Total Samples         │              25 │ OK     │
+├───────────────────────┼─────────────────┼────────┤
+│ Valid Samples         │              25 │ OK     │
+├───────────────────────┼─────────────────┼────────┤
+│ Empty Completions     │               0 │ OK     │
+├───────────────────────┼─────────────────┼────────┤
+│ Truncated Answers     │               0 │ OK     │
+├───────────────────────┼─────────────────┼────────┤
+│ Misaligned Loss Masks │               0 │ OK     │
+├───────────────────────┼─────────────────┼────────┤
+│ Mean Sequence Length  │    111.2 tokens │ Info   │
+├───────────────────────┼─────────────────┼────────┤
+│ Max Sequence Length   │      246 tokens │ Info   │
+├───────────────────────┼─────────────────┼────────┤
+│ Phase Quadrant        │ Clean Execution │ OK     │
+└───────────────────────┴─────────────────┴────────┘
 
 ✓ Preflight Quality Gate Passed: Dataset meets all loss contract requirements.
 ```
@@ -150,17 +164,30 @@ File: clean_sft.jsonl | Task: SFT | Max Length: 256
 TrainSight Preflight Inspection
 File: truncated_answer.jsonl | Task: SFT | Max Length: 256
 
-┌───────────────────────┬────────────┬────────┐
-│ Metric                │      Value │ Status │
-├───────────────────────┼────────────┼────────┤
-│ Total Samples         │         25 │ OK     │
-│ Valid Samples         │         24 │ FAIL   │
-│ Empty Completions     │          0 │ OK     │
-│ Truncated Answers     │          1 │ FAIL   │
-│ Misaligned Loss Masks │          0 │ OK     │
-│ Mean Sequence Length  │ 119.5 tok  │ Info   │
-│ Max Sequence Length   │   256 tok  │ Info   │
-└───────────────────────┴────────────┴────────┘
+                     SFT Preflight Summary                     
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Metric                ┃                      Value ┃ Status ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ Total Samples         │                         25 │ OK     │
+├───────────────────────┼────────────────────────────┼────────┤
+│ Valid Samples         │                         25 │ OK     │
+├───────────────────────┼────────────────────────────┼────────┤
+│ Empty Completions     │                          0 │ OK     │
+├───────────────────────┼────────────────────────────┼────────┤
+│ Truncated Answers     │                          1 │ FAIL   │
+├───────────────────────┼────────────────────────────┼────────┤
+│ Misaligned Loss Masks │                          0 │ OK     │
+├───────────────────────┼────────────────────────────┼────────┤
+│ Mean Sequence Length  │               119.7 tokens │ Info   │
+├───────────────────────┼────────────────────────────┼────────┤
+│ Max Sequence Length   │                 256 tokens │ Info   │
+├───────────────────────┼────────────────────────────┼────────┤
+│ Phase Quadrant        │ Validation Alerts Detected │ WARN   │
+└───────────────────────┴────────────────────────────┴────────┘
+
+Actionable Defects & Warnings:
+  ⚠️ 1 sample(s) have truncated assistant answers due to max sequence length limit (256 tokens).
+  ⚠️ 1 sample(s) (4.0%) exceed the configured length limit (256 tokens).
 
 ✗ Preflight Quality Gate Failed: Contract violations detected above.
 ```
@@ -190,9 +217,9 @@ File: clean_dpo.jsonl | Task: DPO | Max Length: 2048
 │ Near-Identical Pairs            │               0 │ Info   │
 │ Duplicate Prompts               │               0 │ Info   │
 │ Mean Prompt Length              │     37.0 tokens │ Info   │
-│ Mean Chosen Length              │     19.7 tokens │ Info   │
-│ Mean Rejected Length            │     11.7 tokens │ Info   │
-│ Length Bias Ratio (C/R)         │            1.69 │ OK     │
+│ Mean Chosen Length              │     21.7 tokens │ Info   │
+│ Mean Rejected Length            │     13.7 tokens │ Info   │
+│ Length Bias Ratio (C/R)         │            1.59 │ OK     │
 │ Over-Budget Prompts (>1024)     │               0 │ OK     │
 │ Over-Budget Completions (>1024) │               0 │ OK     │
 │ Over-Budget Total (>2048)       │               0 │ OK     │
@@ -223,8 +250,8 @@ from trainsight import SFTReconciler, SFTPreprocessor, LossContract
 
 MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-preprocessor = SFTPreprocessor(tokenizer_name=MODEL_NAME, max_seq_len=256)
-contract = LossContract(max_seq_len=256, strict=True)
+preprocessor = SFTPreprocessor(tokenizer=tokenizer, max_seq_len=256)
+contract = LossContract.from_tokenizer(tokenizer, max_seq_len=256, strict=True)
 reconciler = SFTReconciler(tokenizer=tokenizer, contract=contract)
 
 # 1. Define raw sample and derive token boundaries from formatted chat template
@@ -282,7 +309,7 @@ In a local fault-injection comparison, TrainSight and custom assertions detected
 2. **Assertions Coverage**: A focused set of independent custom assertions matched TrainSight's detection coverage on these specific batches. TrainSight's value is packaged preflight checks and shared contract enforcement, rather than unique tensor arithmetic.
 3. **Scope**: These results evaluate specific injected faults in a single frozen configuration (`Qwen/Qwen2.5-0.5B-Instruct`, ChatML, CPU) and do not establish broad superiority over TRL.
 
-| Case | Native TRL (0.24.0) | Custom Assertions | TrainSight (0.2.0) |
+| Case | Native TRL (0.24.0) | Custom Assertions | TrainSight |
 |---|---|---|---|
 | **Clean Input** *(Control)* | Accepted | Accepted | **Accepted** *(No false alarms)* |
 | **Empty Answer** *(Injected Fault)* | Accepted | Blocked | **Blocked** *(Caught Preflight)* |
