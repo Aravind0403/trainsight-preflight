@@ -148,8 +148,27 @@ class SFTInspector:
                 import pyarrow.parquet as pq
                 table = pq.read_table(str(file_path))
                 raw_rows = table.to_pylist()
-            except Exception:
-                raw_rows = []
+            except Exception as e:
+                return SFTReport(
+                    total_samples=0,
+                    valid_samples_count=0,
+                    invalid_rows_count=1,
+                    empty_completion_count=0,
+                    truncated_answers_count=0,
+                    loss_mask_misaligned_count=0,
+                    duplicate_count=0,
+                    length_exceeded_count=0,
+                    oom_risk_count=0,
+                    avg_seq_len=0.0,
+                    std_seq_len=0.0,
+                    min_seq_len=0,
+                    max_seq_len=0,
+                    p95_seq_len=0.0,
+                    p99_seq_len=0.0,
+                    phase_quadrant="Invalid Dataset",
+                    warnings=[f"❌ Failed to read Parquet dataset '{file_path.name}': {e}"],
+                    recommendations=["Ensure the file is a valid Parquet table and pyarrow is installed."],
+                )
         else:
             with open(file_path, "r", encoding="utf-8") as f:
                 for line in f:
@@ -179,9 +198,31 @@ class SFTInspector:
                 max_seq_len=0,
                 p95_seq_len=0.0,
                 p99_seq_len=0.0,
-                phase_quadrant="Clean Execution",
-                warnings=["Dataset file is empty."],
-                recommendations=["Provide a populated training dataset file."],
+                phase_quadrant="Empty Dataset",
+                warnings=["Dataset file is empty or contains no records."],
+                recommendations=["Provide a populated training dataset file with valid training samples."],
+            )
+
+        if not raw_rows and invalid_json_lines > 0:
+            return SFTReport(
+                total_samples=invalid_json_lines,
+                valid_samples_count=0,
+                invalid_rows_count=invalid_json_lines,
+                empty_completion_count=0,
+                truncated_answers_count=0,
+                loss_mask_misaligned_count=0,
+                duplicate_count=0,
+                length_exceeded_count=0,
+                oom_risk_count=0,
+                avg_seq_len=0.0,
+                std_seq_len=0.0,
+                min_seq_len=0,
+                max_seq_len=0,
+                p95_seq_len=0.0,
+                p99_seq_len=0.0,
+                phase_quadrant="Invalid Dataset",
+                warnings=[f"Dataset contains {invalid_json_lines} malformed JSON lines and 0 valid samples."],
+                recommendations=["Fix formatting syntax errors in the JSONL dataset."],
             )
 
         processed_examples: List[SFTExample] = []

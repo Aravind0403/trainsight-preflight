@@ -16,9 +16,9 @@ class SFTReconciler:
         contract: Optional[LossContract] = None,
     ):
         self.tokenizer = tokenizer
-        self.contract = contract or LossContract()
+        self.contract = contract or LossContract.from_tokenizer(tokenizer)
         self.preprocessor = SFTPreprocessor(
-            tokenizer_name=tokenizer.name_or_path if hasattr(tokenizer, "name_or_path") else "Qwen/Qwen2.5-0.5B-Instruct",
+            tokenizer=self.tokenizer,
             max_seq_len=self.contract.max_seq_len,
             truncation=True,
         )
@@ -122,22 +122,31 @@ class SFTReconciler:
                 continue
 
             # Check 6: Template delimiter verification
-            decoded_prompt = self.tokenizer.decode(input_list[:p_len], skip_special_tokens=False)
-            if (self.contract.expected_template_prefix not in decoded_prompt or 
-                self.contract.expected_template_suffix not in decoded_prompt):
-                diagnoses.append(RowDiagnosis(
-                    row_id=r_id,
-                    error_code="TEMPLATE_MISMATCH",
-                    error_message=f"Prompt missing required template delimiters ({self.contract.expected_template_prefix} ... {self.contract.expected_template_suffix}).",
-                    evidence=evidence,
-                ))
-                continue
+            if getattr(self.contract, "check_template_delimiters", True):
+                decoded_prompt = self.tokenizer.decode(input_list[:p_len], skip_special_tokens=False)
+                has_prefix = (
+                    not self.contract.expected_template_prefix
+                    or self.contract.expected_template_prefix in decoded_prompt
+                )
+                has_suffix = (
+                    not self.contract.expected_template_suffix
+                    or self.contract.expected_template_suffix in decoded_prompt
+                )
+                if not (has_prefix and has_suffix):
+                    diagnoses.append(RowDiagnosis(
+                        row_id=r_id,
+                        error_code="TEMPLATE_MISMATCH",
+                        error_message=f"Prompt missing required template delimiters ({self.contract.expected_template_prefix} ... {self.contract.expected_template_suffix}).",
+                        evidence=evidence,
+                    ))
+                    continue
 
             # Check 7: Substantive content (not merely EOS / closing delimiters)
+            eos_tokens = {self.tokenizer.eos_token_id, self.tokenizer.pad_token_id}
             content_tokens = [
                 input_list[i] for i in active_indices
-                if input_list[i] not in (self.tokenizer.eos_token_id, self.tokenizer.pad_token_id)
-                and self.tokenizer.decode([input_list[i]]).strip() not in ("<|im_end|>", "")
+                if input_list[i] not in eos_tokens
+                and self.tokenizer.decode([input_list[i]]).strip() not in ("<|im_end|>", "<|eot_id|>", "</s>", "")
             ]
             if len(content_tokens) == 0:
                 diagnoses.append(RowDiagnosis(

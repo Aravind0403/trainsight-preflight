@@ -59,3 +59,39 @@ def test_cli_check_unsupported_task(clean_sft_path):
     ])
     assert result.exit_code == 1
     assert "Unsupported task" in result.output
+
+def test_cli_check_sft_empty_strict_fails(tmp_path):
+    empty_file = tmp_path / "empty.jsonl"
+    empty_file.write_text("")
+    result = runner.invoke(app, [
+        "check",
+        str(empty_file),
+        "--task", "sft",
+        "--strict",
+    ])
+    assert result.exit_code == 1
+    assert "Preflight Quality Gate Failed" in result.output
+
+def test_cli_check_sft_corrupt_parquet_strict_fails(tmp_path):
+    corrupt_file = tmp_path / "corrupt.parquet"
+    corrupt_file.write_bytes(b"NOT_A_VALID_PARQUET_FILE")
+    result = runner.invoke(app, [
+        "check",
+        str(corrupt_file),
+        "--task", "sft",
+        "--strict",
+    ])
+    assert result.exit_code == 1
+    assert "Preflight Quality Gate Failed" in result.output
+
+def test_cli_check_sft_unavailable_tokenizer_nostrict_fails(clean_sft_path):
+    result = runner.invoke(app, [
+        "check",
+        str(clean_sft_path),
+        "--task", "sft",
+        "--tokenizer", "nonexistent/does-not-exist-trainsight",
+        "--no-strict",
+    ])
+    assert result.exit_code == 0
+    assert "Preflight Quality Gate Failed" in result.output
+    assert "Unable to inspect" in result.output

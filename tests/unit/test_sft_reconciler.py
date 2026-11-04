@@ -62,3 +62,11 @@ def test_unmasked_padding_fails_reconciliation(tokenizer):
     with pytest.raises(ContractViolationError) as exc_info:
         reconciler.audit_batch(batch=batch, prompt_lengths=[3], row_ids=["row_001"])
     assert "PADDING_LABELS_UNMASKED" in str(exc_info.value)
+
+
+def test_sft_reconciler_injected_offline_tokenizer(tokenizer):
+    # Set an offline / unresolvable name_or_path to verify no re-download occurs
+    tokenizer.name_or_path = "offline-cluster/custom-tokenizer-v1"
+    reconciler = SFTReconciler(tokenizer=tokenizer)
+    assert reconciler.preprocessor.tokenizer is tokenizer
+    assert reconciler.contract.expected_template_prefix is not None

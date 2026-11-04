@@ -12,7 +12,7 @@ Unifies preprocessing across training and inspection:
 from dataclasses import dataclass
 from typing import List, Dict, Any, Tuple, Optional
 import torch
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 
 @dataclass
@@ -37,14 +37,20 @@ class SFTPreprocessor:
 
     def __init__(
         self,
-        tokenizer_name: str = "Qwen/Qwen2.5-1.5B-Instruct",
+        tokenizer_name: Optional[str] = "Qwen/Qwen2.5-1.5B-Instruct",
         max_seq_len: int = 2048,
         truncation: bool = True,
+        tokenizer: Optional[PreTrainedTokenizerBase] = None,
     ):
-        self.tokenizer_name = tokenizer_name
         self.max_seq_len = max_seq_len
         self.truncation = truncation
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        if tokenizer is not None:
+            self.tokenizer = tokenizer
+            self.tokenizer_name = getattr(tokenizer, "name_or_path", tokenizer_name or "custom-tokenizer")
+        else:
+            self.tokenizer_name = tokenizer_name or "Qwen/Qwen2.5-1.5B-Instruct"
+            self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name)
+
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 

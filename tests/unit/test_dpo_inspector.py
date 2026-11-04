@@ -39,3 +39,35 @@ def test_dpo_inspector_max_seq_len_threshold_kwarg(clean_dpo_path):
     assert inspector.max_completion_len == 256
     report = inspector.inspect_file(clean_dpo_path)
     assert report.valid_samples_count == 3
+
+
+def test_dpo_multiturn_conversational_exact_tokens(tmp_path):
+    import json
+    multiturn_file = tmp_path / "multiturn_dpo.jsonl"
+    record = {
+        "chosen": [
+            {"role": "user", "content": "Tell me a joke."},
+            {"role": "assistant", "content": "Why did the chicken cross the road? To get to the other side!"},
+            {"role": "user", "content": "Tell me another one."},
+            {"role": "assistant", "content": "What do you call a fake noodle? An impasta!"},
+        ],
+        "rejected": [
+            {"role": "user", "content": "Tell me a joke."},
+            {"role": "assistant", "content": "Why did the chicken cross the road? To get to the other side!"},
+            {"role": "user", "content": "Tell me another one."},
+            {"role": "assistant", "content": "I do not have any more jokes."},
+        ],
+    }
+    multiturn_file.write_text(json.dumps(record) + "\n")
+
+    inspector = DPOInspector(tokenizer_name="Qwen/Qwen2.5-0.5B-Instruct", max_total_len=512)
+    report = inspector.inspect_file(multiturn_file)
+
+    assert report.total_samples == 1
+    assert report.valid_samples_count == 1
+    assert report.identical_pairs_count == 0
+    assert report.empty_pair_count == 0
+    assert report.phase_quadrant == "Clean Execution"
+    assert report.avg_prompt_len > 0
+    assert report.avg_chosen_len > 0
+    assert report.avg_rejected_len > 0

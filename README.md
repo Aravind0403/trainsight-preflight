@@ -1,6 +1,6 @@
 # TrainSight — checks for LLM training inputs and loss masks.
 
-TrainSight inspects SFT and DPO datasets and provides utilities for auditing tokenized training batches. It helps identify empty answers, truncation, and supervision that conflicts with the declared training objective.
+TrainSight adds explicit, tokenizer-aware validation of SFT and DPO training contracts. It detects common dataset and batch-level issues—such as empty targets, answer truncation, prompt-label leakage, padding supervision, and identical DPO pairs—before or during training. It complements trainer frameworks rather than replacing their preprocessing or loss implementations.
 
 **Status**: Early-stage tooling. See the [tested environments](#-tested-environments--ci-coverage) for tested configurations. Automatic trainer integration is experimental.
 
@@ -59,31 +59,39 @@ Whether these faults cause training to crash, produce NaN gradients, or quietly 
 
 ---
 
-## ⚡ 5-Minute Interactive Demo
+## ⚡ One-Minute Demo Walkthrough
 
-TrainSight includes an interactive demonstration that exercises both preflight file inspection and in-memory batch reconciliation:
+TrainSight includes representative technical sample datasets in `sample_data/` and an automated walkthrough:
 
+```bash
+python examples/02_representative_demo.py
+```
+
+*(Validated with `Qwen/Qwen2.5-0.5B-Instruct`, the configured ChatML template, and max sequence lengths 512 / 1024).*
+
+The walkthrough exercises:
+1. **Representative SFT Preflight**: Audits `sample_data/sft_representative_clean.jsonl` and confirms zero contract violations.
+2. **Representative Multi-Turn DPO Preflight**: Audits `sample_data/dpo_representative_clean.jsonl` with full conversational dialogue extraction and tokenizer- and template-aligned token lengths.
+3. **In-Memory Batch Reconciliation**: Compiles a model-ready PyTorch batch with an injected tokenizer and validates loss-contract invariants without network dependencies.
+
+You can also run the quick CLI check interactive demo:
 ```bash
 trainsight demo
 ```
 
-*(Note: The first run downloads tokenizer configuration files if not already cached locally.)*
-
-The demo demonstrates:
-1. **Clean Input Verification**: Audits a clean 3-row synthetic dataset and confirms zero false alarms from the actual inspection report.
-2. **Preflight Truncation Detection**: Evaluates a prompt that consumes the token budget and extracts the resulting failure report.
-3. **Synthetic Corrupted Batch Audit**: Constructs a synthetic tensor batch with unmasked prompt labels (`labels[:p_len] != -100`) and audits it against the loss contract.
-
 ---
 
-## 🔬 Coverage Boundaries: Static vs. In-Memory
+## 🔬 How TrainSight Complements Existing Tooling
 
-TrainSight maintains a clear boundary between static dataset files and in-memory tensors:
+TrainSight maintains a clear boundary between static dataset files and in-memory tensors, complementing existing training frameworks and data tools:
 
-| Boundary | Method | Scope | What It Catches | What It Cannot Catch |
-|---|---|---|---|---|
-| **Tier 1: Static Disk Inspection** | `trainsight check <file>` | Scans entire dataset files on disk | Missing fields, empty completions, sequence truncation against token limits | Post-collation mutations, collator label leaks, runtime padding bugs |
-| **Tier 2: Batch Reconciliation** | `SFTReconciler.audit_batch()` | Audits compiled in-memory batches | Prompt label leakage (`labels != -100`), padding supervision, causal shift ($i \ge 1$) | File-level statistics outside the sampled batch |
+| Workflow Step | Standard Tooling (e.g. TRL / Hugging Face) | Traditional Dataset Linters (e.g. Cleanlab / Schema Validators) | TrainSight Diagnostic Role |
+| :--- | :--- | :--- | :--- |
+| **Disk Input Validation** | Loads datasets into memory; assumes formatting conforms to trainer expectations. | Audits text fields, label noise, and schema types statically. | **Preflight Contract Gate**: Checks tokenizer- and template-aligned token lengths, empty completions, prompt starvation, and identical DPO pairs. |
+| **Batch Collation** | Collates tokens and dynamically masks prompt/padding according to framework defaults. | Does not inspect compiled PyTorch tensors. | **In-Memory Batch Reconciler**: Audits active supervision (`labels != -100`), ensuring prompt and padding tokens do not leak into the loss. |
+| **Causal Supervision** | Computes cross-entropy over active label positions. | N/A | **Causal Shift Assertion**: Verifies that each inspected row retains tokens contributing to shifted autoregressive prediction ($i \ge 1$). |
+
+*(All metrics validated with `Qwen/Qwen2.5-0.5B-Instruct`, the configured ChatML template, and the stated sequence limits).*
 
 ---
 

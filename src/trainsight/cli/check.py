@@ -53,13 +53,37 @@ def check(
         table.add_row("Mean Sequence Length", f"{report.avg_seq_len:.1f} tokens", "[dim]Info[/]")
         table.add_row("Max Sequence Length", f"{report.max_seq_len} tokens", "[dim]Info[/]")
 
+        status_quadrant = (
+            "[green]OK[/]" if report.phase_quadrant == "Clean Execution"
+            else ("[bold red]FAIL[/]" if report.phase_quadrant in ("Defects Detected", "Invalid Dataset", "Empty Dataset", "Unable to Inspect") else "[yellow]WARN[/]")
+        )
+        table.add_row("Phase Quadrant", report.phase_quadrant, status_quadrant)
+
         console.print(table)
 
+        if report.warnings:
+            console.print("\n[bold red]Actionable Defects & Warnings:[/]")
+            for w in report.warnings:
+                console.print(f"  {w}")
+
+        if getattr(report, "advisories", None):
+            console.print("\n[dim]Advisories:[/]")
+            for a in report.advisories:
+                console.print(f"  {a}")
+
+        if report.recommendations:
+            console.print("\n[bold cyan]Recommendations:[/]")
+            for r in report.recommendations:
+                console.print(f"  - {r}")
+
         passed = (
-            report.invalid_rows_count == 0
+            report.total_samples > 0
+            and report.valid_samples_count > 0
+            and report.invalid_rows_count == 0
             and report.empty_completion_count == 0
             and report.truncated_answers_count == 0
             and report.loss_mask_misaligned_count == 0
+            and report.phase_quadrant not in ("Unable to Inspect", "Invalid Dataset", "Empty Dataset")
         )
 
         if passed:
@@ -137,7 +161,7 @@ def check(
             for w in report.warnings:
                 console.print(f"  {w}")
 
-        if report.advisories:
+        if getattr(report, "advisories", None):
             console.print("\n[dim]Advisories:[/]")
             for a in report.advisories:
                 console.print(f"  {a}")
@@ -148,13 +172,15 @@ def check(
                 console.print(f"  - {r}")
 
         passed = (
-            report.invalid_rows_count == 0
+            report.total_samples > 0
+            and report.valid_samples_count > 0
+            and report.invalid_rows_count == 0
             and report.empty_pair_count == 0
             and report.identical_pairs_count == 0
             and report.preference_reversal_count == 0
             and report.prompt_mismatch_count == 0
             and not is_severe_bias
-            and report.phase_quadrant not in ("Invalid Dataset", "Unable to Inspect")
+            and report.phase_quadrant not in ("Invalid Dataset", "Unable to Inspect", "Empty Dataset")
         )
 
         if passed:
